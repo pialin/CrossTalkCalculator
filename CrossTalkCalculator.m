@@ -124,8 +124,8 @@ for iDataFile = 1:NumDataFile
     
     %获取文本文件中的二维数据矩阵
     DataZ = regexp(DataFileContent,[repmat(['(',RegExpNumber,')\t'],[1,GridSizeX]),'[ \t\r\f]*\n'],'tokens');
-    %将数据从字符串cell类型转换成数值型矩阵
-    DataZ = reshape(str2double([DataZ{:}]),GridSizeY,[]);
+    %将数据从字符串cell类型转换成数值型矩阵(为了便于和附图相对比而做了转置)
+    DataZ = reshape(str2double([DataZ{:}]),GridSizeY,[])';
     
     %当得到的二维矩阵尺寸与GridSize指定的不一致时显示错误
     if any(size(DataZ) ~= [GridSizeY, GridSizeX]) 
@@ -168,9 +168,37 @@ end
 [MaxZValue, MaxZIndex] = max(DataStruct(1).DataZ(:));
 [MaxYIndex, MaxXIndex] = ind2sub(size(DataStruct(1).DataZ),MaxZIndex);
 DataZMaxY = DataStruct(1).DataZ(MaxYIndex,:);
+plot(DataY,DataZMaxY);
 
-for iDataFile = 1:NumDataFile
+
+
+for iObject = 1:numel(DataStruct)
     
+    [ObjectMaxZValue, ObjectMaxZIndex] = max(DataStruct(iObject).DataZ(:));
+    [ObjectMaxYIndex, ObjectMaxXIndex] = ind2sub(size(DataStruct(iObject).DataZ), MaxZIndex);
+    ObjectDataMaxY = DataStruct(iObject).DataZ(MaxYIndex,:);
+    ObjectDataX =  DataStruct(iObject).DataX;
+    
+    for iInterference = setdiff(1:numel(DataStruct),iObject)
+        
+        InterferenceDataMaxY = DataStruct(iInterference).DataZ(ObjectMaxYIndex,:);
+        
+        %求目标（Object）和干涉波形（Interference）的相交点
+        %先求二者的差异波
+        DiffDataMaxY = ObjectDataMaxY - InterferenceDataMaxY;
+        
+        %求差异波的错位相乘（后1项乘前1项）波形
+        DislocationSubstract = DiffDataMaxY(2:end) - DiffDataMaxY(1:end-1);
+        
+        %错位相乘小于等于0的点便是目标和干涉波形的相交点
+        IntersectionXIndex = find(DislocationSubstract <= 0);
+        
+        %与目标波形峰值距离最小的相交点
+        [~,IndexNearestIntersection] = min(abs(IntersectionXIndex - ObjectMaxXIndex));
+        IntersectionXIndex = IntersectionXIndex(IndexNearestIntersection);
+        
+        
+    end
     
 
 end
