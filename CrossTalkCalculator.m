@@ -66,6 +66,13 @@ DataStruct(1:NumDataFile) = struct('SourceFilePath', [] , 'SourceLabel', [],...
     'DataX', [], 'DataY', [], 'DataZ', [],...
     'DataZMaxY', [], 'MaxXIndex', [], 'MaxYIndex', [],...
     'MainLobeAmpThreshold', [], 'MainLobeXRange', [],'MainLobeArea', []);
+%如果文件夹中没有找到txt文件
+if NumDataFile == 0
+    %抛出相应警告
+    warning('选中文件夹中无法找到txt数据文件,将退出程序!');
+    %退出脚本
+    return;
+end
 
 %对数据文件列表中的每个文件进行读取
 for iDataFile = 1:NumDataFile
