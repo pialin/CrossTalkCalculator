@@ -40,8 +40,8 @@ if ~strcmp(DefaultDataDirectory, DataDirectoryUpperFolderPath)
     save('DefaultDataDirectory.mat','DefaultDataDirectory');
 end
 
-%调用参数设置脚本设置用户设定的参数
-CrossTalkCalculatorSetting;
+%确定波形主瓣的阈值大小
+MainLobeAmpThreshold = 0.001;
 
 %% 获取数据文件并对其进行读取
 
@@ -308,3 +308,64 @@ CrossTalkTablePath = fullfile(DataDirectory,'CrossTalkTable.mat');
 save(CrossTalkTablePath,'CrossTalkTable','-mat');
 %显示串扰矩阵
 open CrossTalkTable;
+
+
+
+%% 计算串扰曲线
+%所有光强数据的X轴坐标数据(所有波形的X轴坐标均相同,所以取第一个波形的数据即可)
+AllDataX = DataStruct(1).DataX;
+
+%取出最大值所在行的Z轴数据（光强）放入二维矩阵中（第一维对应不同的波，第二维是光强数据）
+AllDataZMaxY = cell2mat({DataStruct.DataZMaxY}');
+
+
+%取所有光源主瓣的最小值（作为波形左侧界限）
+XLeftRange = min([DataStruct.MainLobeXRange]);
+%取所有光源主瓣的最小值（作为波形右侧界限）
+XRightRange = max([DataStruct.MainLobeXRange]);
+%截取主瓣所在区域（去掉主瓣外的伪峰）
+AllDataX = AllDataX(XLeftRange:XRightRange);
+AllDataZMaxY = AllDataZMaxY(:,XLeftRange:XRightRange);
+
+%求出每一个X轴位置处的光强最大值
+MaxDataZMaxY = max(AllDataZMaxY,[],1);
+
+%求出每一个X轴位置处的光强之和
+SumDataZMaxY = sum(AllDataZMaxY,1);
+
+%计算串扰曲线（除去最大值后其他光源强度的和 比 所有光源在X轴的最大值）
+CrossTalkCurve = (SumDataZMaxY - MaxDataZMaxY)./MaxDataZMaxY;
+%寻找串扰曲线的负极性峰
+[~,NegativePeakPos]= findpeaks(-CrossTalkCurve,'MinPeakProminence',0.05);
+
+%创建一个figure对象
+HandleFigure = figure;
+%开启hold在现有figure上绘制曲线
+hold on;
+%绘制所有光源的光强曲线
+for iSource = 1:numel(DataStruct)
+    plot(AllDataX,AllDataZMaxY(iSource,:));
+end
+%绘制串扰曲线（颜色：黑；线宽：2）
+plot(AllDataX,CrossTalkCurve,'k','LineWidth',2);
+plot(AllDataX(NegativePeakPos),CrossTalkCurve((NegativePeakPos)),'.',...
+    'MarkerEdgeColor','r','MarkerSize',20);
+TextLabel = arrayfun(@(x) num2str(x),CrossTalkCurve((NegativePeakPos)),'UniformOutput',false);
+text(AllDataX(NegativePeakPos),CrossTalkCurve((NegativePeakPos)),TextLabel,...
+    'VerticalAlignment','top','HorizontalAlignment','center','Color','r');
+%添加曲线图标题
+title('串扰曲线示意图');
+
+%添加曲线标注
+legend({DataStruct.SourceLabel,'串扰曲线'});
+
+%添加X轴标注
+xlabel('横向位置（mm）');
+%添加Y轴标注
+ylabel('归一化光强/串扰强度')
+%完成所有曲线绘制后关闭hold
+hold off;
+%生成存储串扰曲线的figure文件名
+CrossTalkCurveFigurePath = fullfile(DataDirectory,'串扰曲线.fig');
+%存储figure
+saveas(HandleFigure,CrossTalkCurveFigurePath);
